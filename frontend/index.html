@@ -113,11 +113,25 @@
       </main>
 
       <section class="panel payloadPanel">
-        <h2 class="panelTitle">Request (OptimizeToursRequest)</h2>
-        <pre id="request" class="code"></pre>
-        <div class="divider"></div>
-        <h2 class="panelTitle">Response (OptimizeToursResponse)</h2>
-        <pre id="response" class="code"></pre>
+        <div class="payloadHeader">
+          <h2 class="panelTitle">Payloads</h2>
+          <div class="payloadHeaderActions">
+            <button class="btnSecondary" type="button" data-copy-target="request">Copy request</button>
+            <button class="btnSecondary" type="button" data-copy-target="response">Copy response</button>
+          </div>
+        </div>
+
+        <div class="payloadGrid">
+          <div class="payloadItem">
+            <h3 class="payloadItemTitle">Request (OptimizeToursRequest)</h3>
+            <pre id="request" class="code codeBlock"></pre>
+          </div>
+
+          <div class="payloadItem">
+            <h3 class="payloadItemTitle">Response (OptimizeToursResponse)</h3>
+            <pre id="response" class="code codeBlock"></pre>
+          </div>
+        </div>
       </section>
     </div>
 

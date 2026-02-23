@@ -340,6 +340,23 @@ async function main() {
   const mapState = initMap();
   $("response").textContent = "Fill out inputs and click “Run optimizer”.";
 
+  // Payload copy buttons.
+  document.querySelectorAll("button[data-copy-target]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const targetId = btn.getAttribute("data-copy-target");
+      const el = targetId ? document.getElementById(targetId) : null;
+      const text = el?.textContent ?? "";
+      if (!text.trim()) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        $("status").textContent = `Copied ${targetId}.`;
+      } catch {
+        // Clipboard may be blocked; fail silently.
+      }
+    });
+  });
+
   // Default times + 2 example shipments.
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
