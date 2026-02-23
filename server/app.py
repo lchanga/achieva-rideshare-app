@@ -6,15 +6,15 @@ Keeping this as a factory (`create_app`) makes the app easier to test and
 configure (and avoids side effects at import time).
 """
 
-from flask import Flask, jsonify
-from flasgger import Swagger
 from pathlib import Path
-from flask import send_from_directory
 
-from server.routes.client import client_bp
-from server.routes.driver import driver_bp
-from server.routes.optimizer import optimizer_bp
-from server.routes.staff import staff_bp
+from flask import Flask, jsonify, send_from_directory
+from flask_smorest import Api
+
+from server.routes.client import client_blp
+from server.routes.driver import driver_blp
+from server.routes.optimizer import optimizer_blp
+from server.routes.staff import staff_blp
 
 
 def create_app() -> Flask:
@@ -29,42 +29,20 @@ def create_app() -> Flask:
     """
     app = Flask(__name__)
     frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
-
-    swagger_template = {
-        "swagger": "2.0",
-        "info": {
-            "title": "AchievaPath API",
-            "description": "Swagger/OpenAPI documentation for AchievaPath.",
-            "version": "0.1.0",
-        },
-    }
-    swagger_config = {
-        "headers": [],
-        "specs": [
-            {
-                "endpoint": "apispec_1",
-                "route": "/apispec_1.json",
-                "rule_filter": lambda rule: True,
-                "model_filter": lambda tag: True,
-            }
-        ],
-        "static_url_path": "/flasgger_static",
-        "swagger_ui": True,
-        "specs_route": "/apidocs/",
-    }
-    Swagger(app, config=swagger_config, template=swagger_template)
+    app.config.update(
+        API_TITLE="AchievaPath API",
+        API_VERSION="0.1.0",
+        OPENAPI_VERSION="3.0.3",
+        OPENAPI_URL_PREFIX="/",
+        OPENAPI_JSON_PATH="openapi.json",
+        # End with "/" so both "/apidocs" and "/apidocs/" work (Flask redirects).
+        OPENAPI_SWAGGER_UI_PATH="/apidocs/",
+        OPENAPI_SWAGGER_UI_URL="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/",
+    )
+    api = Api(app)
 
     @app.get("/")
     def home():
-        """
-        Friendly homepage.
-        ---
-        tags:
-          - Root
-        responses:
-          200:
-            description: Plain-text landing page with helpful links.
-        """
         return (
             "AchievaPath API is running.\n\n"
             "Try:\n"
@@ -72,6 +50,7 @@ def create_app() -> Flask:
             "- GET  /api/driver/routes/available\n"
             "- GET  /api/staff/clients\n"
             "- Open /ui/ (frontend demo)\n"
+            "- Swagger UI: /apidocs/\n"
         )
 
     @app.get("/ui/")
@@ -84,20 +63,6 @@ def create_app() -> Flask:
 
     @app.get("/test-db")
     def test_db():
-        """
-        Compatibility endpoint.
-
-        This keeps the original smoke test path working while the rest of the
-        API lives under `/api/*`.
-        ---
-        tags:
-          - Root
-        responses:
-          200:
-            description: SQL Server connectivity check succeeded.
-          500:
-            description: SQL Server connectivity check failed.
-        """
         try:
             from server.db import get_db_connection
 
@@ -117,11 +82,11 @@ def create_app() -> Flask:
         except Exception as e:
             return jsonify({"status": "Error", "error_details": str(e)}), 500
 
-    # Attach role-based API route groups to a single Flask app.
-    app.register_blueprint(client_bp)
-    app.register_blueprint(driver_bp)
-    app.register_blueprint(staff_bp)
-    app.register_blueprint(optimizer_bp)
+    # Attach role-based API route groups to a single Flask app + OpenAPI.
+    api.register_blueprint(client_blp)
+    api.register_blueprint(driver_blp)
+    api.register_blueprint(staff_blp)
+    api.register_blueprint(optimizer_blp)
 
     return app
 

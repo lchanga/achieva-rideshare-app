@@ -7,5 +7,7 @@ MarkupSafe==3.0.3
 pyodbc==5.3.0
 python-dotenv==1.2.1
 Werkzeug==3.1.5
-flasgger==0.9.7.1
+SQLAlchemy==2.0.46
+marshmallow==3.26.2
+flask-smorest==0.46.2
 
