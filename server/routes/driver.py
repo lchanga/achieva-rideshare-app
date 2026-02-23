@@ -36,8 +36,8 @@ class AvailableRoutesResource(MethodView):
 class AcceptRouteResource(MethodView):
     @driver_blp.arguments(AcceptRouteRequestSchema, required=False)
     @driver_blp.response(200, MessageRouteResponseSchema)
-    @driver_blp.alt_response(400, ErrorSchema)
-    @driver_blp.alt_response(404, ErrorSchema)
+    @driver_blp.alt_response(400, schema=ErrorSchema)
+    @driver_blp.alt_response(404, schema=ErrorSchema)
     def post(self, data: dict, route_id: str):
         result = accept_route(route_id, data or {})
         if "error" in result:
@@ -48,7 +48,7 @@ class AcceptRouteResource(MethodView):
 @driver_blp.route("/routes/<string:route_id>")
 class RouteDetailsResource(MethodView):
     @driver_blp.response(200, RouteResponseSchema)
-    @driver_blp.alt_response(404, ErrorSchema)
+    @driver_blp.alt_response(404, schema=ErrorSchema)
     def get(self, route_id: str):
         result = get_route(route_id)
         if "error" in result:
@@ -59,7 +59,7 @@ class RouteDetailsResource(MethodView):
 @driver_blp.route("/routes/<string:route_id>/complete")
 class CompleteRouteResource(MethodView):
     @driver_blp.response(200, MessageRouteResponseSchema)
-    @driver_blp.alt_response(404, ErrorSchema)
+    @driver_blp.alt_response(404, schema=ErrorSchema)
     def post(self, route_id: str):
         result = complete_route(route_id)
         if "error" in result:
@@ -71,8 +71,8 @@ class CompleteRouteResource(MethodView):
 class RemoveStopResource(MethodView):
     @driver_blp.arguments(RemoveStopRequestSchema)
     @driver_blp.response(200, MessageRouteResponseSchema)
-    @driver_blp.alt_response(400, ErrorSchema)
-    @driver_blp.alt_response(404, ErrorSchema)
+    @driver_blp.alt_response(400, schema=ErrorSchema)
+    @driver_blp.alt_response(404, schema=ErrorSchema)
     def post(self, data: dict, route_id: str):
         result = remove_stop(route_id, data)
         if "error" in result:

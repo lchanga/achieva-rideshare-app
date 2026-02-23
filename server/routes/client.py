@@ -31,7 +31,7 @@ client_blp = Blueprint(
 class RideRequestsResource(MethodView):
     @client_blp.arguments(RideRequestCreateSchema)
     @client_blp.response(201, RideRequestCreateResponseSchema)
-    @client_blp.alt_response(400, ErrorSchema)
+    @client_blp.alt_response(400, schema=ErrorSchema)
     def post(self, data: dict):
         result = create_ride_request(data)
         if "error" in result:
@@ -46,7 +46,7 @@ class RideRequestsResource(MethodView):
 @client_blp.route("/ride-requests/<string:ride_id>")
 class RideRequestResource(MethodView):
     @client_blp.response(200, RideRequestGetResponseSchema)
-    @client_blp.alt_response(404, ErrorSchema)
+    @client_blp.alt_response(404, schema=ErrorSchema)
     def get(self, ride_id: str):
         result = get_ride_request(ride_id)
         if "error" in result:
@@ -54,8 +54,8 @@ class RideRequestResource(MethodView):
         return result
 
     @client_blp.response(200, RideRequestDeleteResponseSchema)
-    @client_blp.alt_response(400, ErrorSchema)
-    @client_blp.alt_response(404, ErrorSchema)
+    @client_blp.alt_response(400, schema=ErrorSchema)
+    @client_blp.alt_response(404, schema=ErrorSchema)
     def delete(self, ride_id: str):
         result = delete_ride_request(ride_id)
         if "error" in result:
@@ -64,8 +64,8 @@ class RideRequestResource(MethodView):
 
     @client_blp.arguments(RideRequestUpdateSchema(partial=True))
     @client_blp.response(200, RideRequestUpdateResponseSchema)
-    @client_blp.alt_response(400, ErrorSchema)
-    @client_blp.alt_response(404, ErrorSchema)
+    @client_blp.alt_response(400, schema=ErrorSchema)
+    @client_blp.alt_response(404, schema=ErrorSchema)
     def put(self, data: dict, ride_id: str):
         result = update_ride_request(ride_id, data)
         if "error" in result:

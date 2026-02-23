@@ -17,7 +17,7 @@ optimizer_blp = Blueprint(
 class OptimizeToursResource(MethodView):
     @optimizer_blp.arguments(OptimizeToursAnySchema)
     @optimizer_blp.response(200, None)
-    @optimizer_blp.alt_response(400, ErrorSchema)
+    @optimizer_blp.alt_response(400, schema=ErrorSchema)
     def post(self, req_json: dict):
         if not isinstance(req_json, dict):
             abort(400, error="Request body must be a JSON object")

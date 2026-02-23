@@ -38,7 +38,7 @@ staff_blp = Blueprint(
 class ClientsResource(MethodView):
     @staff_blp.arguments(ClientCreateSchema)
     @staff_blp.response(201, ClientCreateResponseSchema)
-    @staff_blp.alt_response(400, ErrorSchema)
+    @staff_blp.alt_response(400, schema=ErrorSchema)
     def post(self, data: dict):
         result = create_client(data)
         if "error" in result:
@@ -53,7 +53,7 @@ class ClientsResource(MethodView):
 @staff_blp.route("/clients/<string:client_id>")
 class ClientResource(MethodView):
     @staff_blp.response(200, ClientGetResponseSchema)
-    @staff_blp.alt_response(404, ErrorSchema)
+    @staff_blp.alt_response(404, schema=ErrorSchema)
     def get(self, client_id: str):
         result = get_client(client_id)
         if "error" in result:
@@ -62,8 +62,8 @@ class ClientResource(MethodView):
 
     @staff_blp.arguments(ClientUpdateSchema(partial=True))
     @staff_blp.response(200, ClientCreateResponseSchema)
-    @staff_blp.alt_response(400, ErrorSchema)
-    @staff_blp.alt_response(404, ErrorSchema)
+    @staff_blp.alt_response(400, schema=ErrorSchema)
+    @staff_blp.alt_response(404, schema=ErrorSchema)
     def put(self, data: dict, client_id: str):
         result = update_client(client_id, data)
         if "error" in result:
@@ -75,8 +75,8 @@ class ClientResource(MethodView):
 class PermanentLocationsResource(MethodView):
     @staff_blp.arguments(LocationCreateSchema)
     @staff_blp.response(201, LocationCreateResponseSchema)
-    @staff_blp.alt_response(400, ErrorSchema)
-    @staff_blp.alt_response(404, ErrorSchema)
+    @staff_blp.alt_response(400, schema=ErrorSchema)
+    @staff_blp.alt_response(404, schema=ErrorSchema)
     def post(self, data: dict, client_id: str):
         result = add_permanent_location(client_id, data)
         if "error" in result:
@@ -84,7 +84,7 @@ class PermanentLocationsResource(MethodView):
         return result
 
     @staff_blp.response(200, LocationsListResponseSchema)
-    @staff_blp.alt_response(404, ErrorSchema)
+    @staff_blp.alt_response(404, schema=ErrorSchema)
     def get(self, client_id: str):
         result = list_permanent_locations(client_id)
         if "error" in result:
@@ -96,7 +96,7 @@ class PermanentLocationsResource(MethodView):
 class PermanentLocationResource(MethodView):
     @staff_blp.arguments(LocationUpdateSchema(partial=True))
     @staff_blp.response(200, LocationUpdateResponseSchema)
-    @staff_blp.alt_response(404, ErrorSchema)
+    @staff_blp.alt_response(404, schema=ErrorSchema)
     def put(self, data: dict, client_id: str, location_id: str):
         result = update_permanent_location(client_id, location_id, data)
         if "error" in result:
@@ -104,7 +104,7 @@ class PermanentLocationResource(MethodView):
         return result
 
     @staff_blp.response(200, LocationDeleteResponseSchema)
-    @staff_blp.alt_response(404, ErrorSchema)
+    @staff_blp.alt_response(404, schema=ErrorSchema)
     def delete(self, client_id: str, location_id: str):
         result = delete_permanent_location(client_id, location_id)
         if "error" in result:
