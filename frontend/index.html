@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AchievaPath – Frontend Demo</title>
+
+    <link rel="stylesheet" href="./styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div>
+          <h1 class="title">AchievaPath Frontend Demo</h1>
+          <p class="subtitle">
+            Fill in an OptimizeToursRequest → calls the backend optimizer → draws stop order on a map.
+            <br />
+            To deploy elsewhere, edit <code>frontend/config.js</code> only.
+          </p>
+        </div>
+        <div class="actions">
+          <button id="runBtn" class="btn">Run optimizer</button>
+          <a class="link" href="/apidocs/" target="_blank" rel="noreferrer">Swagger</a>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="panel inputsPanel">
+          <h2 class="panelTitle">Inputs</h2>
+
+          <form id="form" class="form">
+            <div class="grid2">
+              <div class="field">
+                <label for="requestLabel">Request label</label>
+                <input id="requestLabel" name="requestLabel" type="text" value="demo-optimize" />
+              </div>
+
+              <div class="field">
+                <label for="timeout">Timeout</label>
+                <select id="timeout" name="timeout">
+                  <option value="2s" selected>2s</option>
+                  <option value="5s">5s</option>
+                  <option value="10s">10s</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid2">
+              <div class="field">
+                <label for="globalStart">Global start time</label>
+                <input id="globalStart" name="globalStart" type="datetime-local" required />
+              </div>
+              <div class="field">
+                <label for="globalEnd">Global end time</label>
+                <input id="globalEnd" name="globalEnd" type="datetime-local" required />
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <h3 class="sectionTitle">Vehicle (required)</h3>
+
+            <div class="grid2">
+              <div class="field">
+                <label for="vehicleLabel">Vehicle label</label>
+                <input id="vehicleLabel" name="vehicleLabel" type="text" value="van_1" required />
+              </div>
+              <div class="field help">
+                <label>Notes</label>
+                <div class="helpText">
+                  Times are entered in your local time zone and converted to RFC3339 <code>Z</code> timestamps.
+                </div>
+              </div>
+            </div>
+
+            <div class="grid2">
+              <div class="field">
+                <label for="vehicleStart">Vehicle start window start</label>
+                <input id="vehicleStart" name="vehicleStart" type="datetime-local" required />
+              </div>
+              <div class="field">
+                <label for="vehicleStartEnd">Vehicle start window end</label>
+                <input id="vehicleStartEnd" name="vehicleStartEnd" type="datetime-local" required />
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row">
+              <h3 class="sectionTitle">Shipments (required)</h3>
+              <button id="addShipmentBtn" class="btnSecondary" type="button">Add shipment</button>
+            </div>
+
+            <div id="shipments" class="shipments"></div>
+          </form>
+
+          <div class="divider"></div>
+
+          <h2 class="panelTitle">Stops</h2>
+          <ol id="stopsList" class="stops"></ol>
+          <div id="status" class="status" aria-live="polite"></div>
+        </section>
+
+        <section class="mapWrap" aria-label="Map showing route">
+          <div id="map" class="map"></div>
+        </section>
+      </main>
+
+      <section class="panel payloadPanel">
+        <div class="payloadHeader">
+          <h2 class="panelTitle">Payloads</h2>
+          <div class="payloadHeaderActions">
+            <button class="btnSecondary" type="button" data-copy-target="request">Copy request</button>
+            <button class="btnSecondary" type="button" data-copy-target="response">Copy response</button>
+          </div>
+        </div>
+
+        <div class="payloadGrid">
+          <div class="payloadItem">
+            <h3 class="payloadItemTitle">Request (OptimizeToursRequest)</h3>
+            <pre id="request" class="code codeBlock"></pre>
+          </div>
+
+          <div class="payloadItem">
+            <h3 class="payloadItemTitle">Response (OptimizeToursResponse)</h3>
+            <pre id="response" class="code codeBlock"></pre>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
+
