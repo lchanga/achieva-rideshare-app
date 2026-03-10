@@ -1,28 +1,51 @@
 import os
-from google.cloud import optimization_v1
-from server.optimizer.base import Optimizer
+import googlemaps
+from datetime import datetime, timedelta
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-class GoogleOptimizer(Optimizer):
-    def __init__(self):
-        self.client = optimization_v1.FleetRoutingClient()
-        self.project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+from server.db import get_engine
+from server.models.ride_request import RideRequest
+from server.models.optimized_route import OptimizedRoute
+from server.models.route_stop import RouteStop
 
-    def optimize_tours(self, request_json: dict) -> dict:
-        """
-        Calls the Google Fleet Routing API.
-        The request_json should match the OptimizeToursRequest message.
-        """
-        if not self.project_id:
-            raise ValueError("GOOGLE_CLOUD_PROJECT_ID is not set.")
-
-        request_json['parent'] = f"projects/{self.project_id}"
+class GoogleOptimizer:
+    @staticmethod
+    def run_optimization_sync():
+        # 1. Setup
+        api_key = os.getenv('GOOGLE_MAPS_API_KEY')
+        gmaps = googlemaps.Client(key=api_key)
+        engine = get_engine()
         
-        try:
-
-            request = optimization_v1.OptimizeToursRequest(request_json)
-            response = self.client.optimize_tours(request=request)
+        with Session(engine) as session:
+            # 2. Get pending rides
+            stmt = select(RideRequest).where(RideRequest.status == "pending")
+            rides = session.execute(stmt).scalars().all()
             
+            if not rides:
+                return {"message": "No pending rides to optimize"}
 
-            return optimization_v1.OptimizeToursResponse.to_dict(response)
-        except Exception as e:
-            raise Exception(f"Google Optimization API Error: {str(e)}")
+            # 3. Optimization Logic (Directions API)
+            origin = (rides[0].pickup_latitude, rides[0].pickup_longitude)
+            waypoints = [(r.pickup_latitude, r.pickup_longitude) for r in rides[1:]]
+
+            directions_result = gmaps.directions(
+                origin=origin,
+                destination=origin,
+                waypoints=waypoints,
+                optimize_waypoints=True,
+                mode="driving"
+            )
+            
+            # 4. Save to SQL Server
+            new_route = OptimizedRoute(status="available", created_at=datetime.utcnow())
+            session.add(new_route)
+            session.flush()
+
+            for ride in rides:
+                stop = RouteStop(route_id=new_route.route_id, stop_type="pickup")
+                ride.status = "scheduled"
+                session.add(stop)
+                
+            session.commit()
+            return {"message": f"SUCCESS: Google reordered {len(rides)} stops!"}
