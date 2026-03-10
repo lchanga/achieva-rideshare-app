@@ -1,33 +1,14 @@
-"""
-Database connectivity helpers.
-
-This project connects to Achieva's Microsoft SQL Server using ODBC.
-Connection settings are provided via environment variables (usually from `.env`).
-"""
-
 import os
-
+import urllib
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
 from dotenv import load_dotenv
 
-# Load `.env` into process env for local dev; in Docker, Compose also injects env vars.
 load_dotenv()
 
-
-def get_db_connection():
-    """
-    Create and return a live SQL Server connection via pyodbc.
-
-    Notes:
-    - `pyodbc` is imported lazily so the web server can start even if pyodbc
-      isn't installed in a local environment (only DB routes need it).
-    - The SQL Server host/port and credentials come from env vars:
-      DB_SERVER, DB_NAME, DB_USER, DB_PWD
-    """
-    import pyodbc
-
-    # ODBC Driver 18 defaults to encrypted connections; we explicitly allow
-    # self-signed/enterprise certs by trusting the server certificate.
-    conn_str = (
+# 1. The Raw Connection String (shared logic)
+def _get_conn_str():
+    return (
         "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={os.getenv('DB_SERVER')};"
         f"DATABASE={os.getenv('DB_NAME')};"
@@ -36,5 +17,24 @@ def get_db_connection():
         "Encrypt=yes;"
         "TrustServerCertificate=yes;"
     )
-    return pyodbc.connect(conn_str)
 
+# 2. Keep your original helper (for raw SQL)
+def get_db_connection():
+    import pyodbc
+    return pyodbc.connect(_get_conn_str())
+
+# 3. NEW: SQLAlchemy Engine (for your new Services)
+def get_engine():
+    """
+    Creates a SQLAlchemy engine. 
+    Note the 'mssql+pyodbc://' prefix and the URL encoding.
+    """
+    params = urllib.parse.quote_plus(_get_conn_str())
+    engine_url = f"mssql+pyodbc:///?odbc_connect={params}"
+    
+    # pool_pre_ping=True helps keep the connection alive if SQL Server drops it
+    return create_engine(engine_url, pool_pre_ping=True)
+
+# 4. NEW: Global Session Factory
+# This makes it easier to use 'Session(engine)' in your services
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
