@@ -1,125 +1,76 @@
-"""
-Staff service layer.
-
-Bare-minimum in-memory persistence while we iterate quickly.
-"""
-
 from __future__ import annotations
-
-from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from uuid import uuid4
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-
-@dataclass
-class PermanentLocation:
-    id: str
-    label: str
-    address: str
-
-
-@dataclass
-class Client:
-    id: str
-    full_name: str
-    phone: str | None = None
-    email: str | None = None
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat(timespec="seconds") + "Z")
-    permanent_locations: list[PermanentLocation] = field(default_factory=list)
-
-
-# In-memory store (temporary). Replace with SQL Server persistence later.
-_CLIENTS: dict[str, Client] = {}
-
+from server.db import get_engine
+# Import the models that match your SQL Server tables
+from server.models.user import User as ClientModel  # In your schema, Clients are usually Users
+from server.models.client_location import ClientLocation as LocationModel
 
 def create_client(data: dict) -> dict:
-    full_name = (data.get("full_name") or "").strip()
-    phone = (data.get("phone") or "").strip() or None
-    email = (data.get("email") or "").strip() or None
-
-    client_id = str(uuid4())
-    client = Client(id=client_id, full_name=full_name, phone=phone, email=email)
-    _CLIENTS[client_id] = client
-
-    return {"message": "Client created", "client": asdict(client)}
-
+    engine = get_engine()
+    try:
+        with Session(engine) as session:
+            new_client = ClientModel(
+                full_name=data.get("full_name"),
+                email=data.get("email"),
+                phone_number=data.get("phone"),
+                role="client",  # Assuming a 'role' column exists
+                created_at=datetime.utcnow()
+            )
+            session.add(new_client)
+            session.commit()
+            session.refresh(new_client)
+            
+            return {
+                "message": "Client created in database",
+                "client": {"id": str(new_client.user_id), "full_name": new_client.full_name}
+            }
+    except Exception as e:
+        return {"error": f"DB Error: {str(e)}", "code": "db_failure"}
 
 def list_clients() -> dict:
-    clients = [asdict(c) for c in _CLIENTS.values()]
-    clients.sort(key=lambda c: c["created_at"])
-    return {"clients": clients}
-
-
-def get_client(client_id: str) -> dict:
-    client = _CLIENTS.get(client_id)
-    if not client:
-        return {"error": "Client not found", "code": "not_found"}
-    return {"client": asdict(client)}
-
-
-def update_client(client_id: str, data: dict) -> dict:
-    client = _CLIENTS.get(client_id)
-    if not client:
-        return {"error": "Client not found", "code": "not_found"}
-
-    if "full_name" in data:
-        client.full_name = (data.get("full_name") or "").strip()
-    if "phone" in data:
-        client.phone = (data.get("phone") or "").strip() or None
-    if "email" in data:
-        client.email = (data.get("email") or "").strip() or None
-
-    return {"message": "Client updated", "client": asdict(client)}
-
+    engine = get_engine()
+    with Session(engine) as session:
+        stmt = select(ClientModel).where(ClientModel.role == "client")
+        results = session.execute(stmt).scalars().all()
+        return {
+            "clients": [
+                {"id": str(c.user_id), "full_name": c.full_name, "email": c.email} 
+                for c in results
+            ]
+        }
 
 def add_permanent_location(client_id: str, data: dict) -> dict:
-    client = _CLIENTS.get(client_id)
-    if not client:
-        return {"error": "Client not found", "code": "not_found"}
-
-    label = (data.get("label") or "").strip()
-    address = (data.get("address") or "").strip()
-
-    location = PermanentLocation(id=str(uuid4()), label=label, address=address)
-    client.permanent_locations.append(location)
-
-    return {"message": "Permanent location added", "location": asdict(location)}
-
+    engine = get_engine()
+    try:
+        with Session(engine) as session:
+            new_loc = LocationModel(
+                user_id=int(client_id),
+                location_name=data.get("label"),
+                address=data.get("address"),
+                is_active=True
+            )
+            session.add(new_loc)
+            session.commit()
+            session.refresh(new_loc)
+            
+            return {
+                "message": "Location saved to SQL Server",
+                "location": {"id": str(new_loc.location_id), "address": new_loc.address}
+            }
+    except Exception as e:
+        return {"error": str(e), "code": "db_failure"}
 
 def list_permanent_locations(client_id: str) -> dict:
-    client = _CLIENTS.get(client_id)
-    if not client:
-        return {"error": "Client not found", "code": "not_found"}
-    return {"locations": [asdict(l) for l in client.permanent_locations]}
-
-
-def update_permanent_location(client_id: str, location_id: str, data: dict) -> dict:
-    client = _CLIENTS.get(client_id)
-    if not client:
-        return {"error": "Client not found", "code": "not_found"}
-
-    location = next((l for l in client.permanent_locations if l.id == location_id), None)
-    if not location:
-        return {"error": "Location not found", "code": "location_not_found"}
-
-    if "label" in data:
-        location.label = (data.get("label") or "").strip()
-
-    if "address" in data:
-        location.address = (data.get("address") or "").strip()
-
-    return {"message": "Permanent location updated", "location": asdict(location)}
-
-
-def delete_permanent_location(client_id: str, location_id: str) -> dict:
-    client = _CLIENTS.get(client_id)
-    if not client:
-        return {"error": "Client not found", "code": "not_found"}
-
-    before = len(client.permanent_locations)
-    client.permanent_locations = [l for l in client.permanent_locations if l.id != location_id]
-    if len(client.permanent_locations) == before:
-        return {"error": "Location not found", "code": "location_not_found"}
-
-    return {"message": "Permanent location deleted", "location_id": location_id}
-
+    engine = get_engine()
+    with Session(engine) as session:
+        stmt = select(LocationModel).where(LocationModel.user_id == int(client_id))
+        results = session.execute(stmt).scalars().all()
+        return {
+            "locations": [
+                {"id": str(l.location_id), "label": l.location_name, "address": l.address}
+                for l in results
+            ]
+        }

@@ -1,134 +1,97 @@
-"""
-Client service layer.
-
-Bare-minimum in-memory persistence for ride requests.
-Validation is intentionally minimal while we iterate quickly.
-"""
-
 from __future__ import annotations
-
-from dataclasses import asdict, dataclass
 from datetime import datetime
-from uuid import uuid4
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+# Import the actual SQLAlchemy Model and the DB engine helper
+from server.db import get_engine 
+from server.models.ride_request import RideRequest as RideRequestModel
 
-@dataclass(frozen=True)
-class RideRequest:
-    id: str
-    pickup_location: str
-    dropoff_location: str
-    date: str
-    pickup_window_start: str
-    pickup_window_end: str
-    dropoff_window_start: str
-    dropoff_window_end: str
-    status: str
-    created_at: str
-
-
-# In-memory store (temporary). Replace with SQL Server persistence later.
-_RIDE_REQUESTS: dict[str, RideRequest] = {}
-
-
-def _derive_date(value: str) -> str:
-    """
-    Best-effort YYYY-MM-DD derivation from an ISO-ish datetime string.
-    """
-    raw = (value or "").strip()
-    return raw[:10] if len(raw) >= 10 else ""
-
+def _parse_ts(ts_str: str) -> datetime:
+    """Helper to convert ISO strings to datetime objects for SQL."""
+    if not ts_str:
+        return datetime.utcnow()
+    # Normalize 'Z' to '+00:00' for Python's fromisoformat
+    clean_ts = ts_str.strip().replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(clean_ts)
+    except ValueError:
+        # Fallback if the string is just a date like '2026-03-10'
+        return datetime.strptime(clean_ts[:10], '%Y-%m-%d')
 
 def create_ride_request(data: dict) -> dict:
-    pickup = (data.get("pickup_location") or "").strip()
-    dropoff = (data.get("dropoff_location") or "").strip()
-    pickup_window_start = (data.get("pickup_window_start") or "").strip()
-    pickup_window_end = (data.get("pickup_window_end") or "").strip()
-    dropoff_window_start = (data.get("dropoff_window_start") or "").strip()
-    dropoff_window_end = (data.get("dropoff_window_end") or "").strip()
-    date_str = (data.get("date") or "").strip() or _derive_date(pickup_window_start)
+    engine = get_engine() 
+    try:
+        with Session(engine) as session:
+            # We map the frontend JSON fields to the SQLAlchemy Model columns
+            new_ride = RideRequestModel(
+                passenger_id=data.get("passenger_id", 1), # Default for demo
+                pickup_client_location_id=data.get("pickup_location_id"),
+                dropoff_client_location_id=data.get("dropoff_location_id"),
+                ride_date=_parse_ts(data.get("pickup_window_start")).date(),
+                pickup_window_start=_parse_ts(data.get("pickup_window_start")),
+                pickup_window_end=_parse_ts(data.get("pickup_window_end")),
+                dropoff_window_start=_parse_ts(data.get("dropoff_window_start")),
+                dropoff_window_end=_parse_ts(data.get("dropoff_window_end")),
+                status="requested",
+                api_shipment_label=f"shipment_{int(datetime.utcnow().timestamp())}"
+            )
+            
+            session.add(new_ride)
+            session.commit()
+            session.refresh(new_ride) # Populate the auto-incremented request_id
 
-    ride_id = str(uuid4())
-    ride = RideRequest(
-        id=ride_id,
-        pickup_location=pickup,
-        dropoff_location=dropoff,
-        date=date_str,
-        pickup_window_start=pickup_window_start,
-        pickup_window_end=pickup_window_end,
-        dropoff_window_start=dropoff_window_start,
-        dropoff_window_end=dropoff_window_end,
-        status="Pending Optimization",
-        created_at=datetime.utcnow().isoformat(timespec="seconds") + "Z",
-    )
-    _RIDE_REQUESTS[ride_id] = ride
-
-    return {"message": "Ride request created", "ride": asdict(ride)}
-
+            return {
+                "message": "Ride request created", 
+                "ride": {
+                    "id": str(new_ride.request_id), 
+                    "status": new_ride.status,
+                    "created_at": datetime.utcnow().isoformat() + "Z"
+                }
+            }
+    except Exception as e:
+        return {"error": f"Database error: {str(e)}", "code": "db_failure"}
 
 def list_ride_requests() -> dict:
-    rides = [asdict(r) for r in _RIDE_REQUESTS.values()]
-    rides.sort(key=lambda r: (r["date"], r["created_at"]))
-    return {"rides": rides}
-
+    engine = get_engine()
+    with Session(engine) as session:
+        # Get all rides, ordered by date
+        stmt = select(RideRequestModel).order_by(RideRequestModel.ride_date.desc())
+        results = session.execute(stmt).scalars().all()
+        
+        rides = []
+        for r in results:
+            rides.append({
+                "id": str(r.request_id),
+                "status": r.status,
+                "date": r.ride_date.isoformat() if r.ride_date else None,
+                "pickup_location": f"Location ID: {r.pickup_client_location_id}",
+                "dropoff_location": f"Location ID: {r.dropoff_client_location_id}"
+            })
+        return {"rides": rides}
 
 def get_ride_request(ride_id: str) -> dict:
-    ride = _RIDE_REQUESTS.get(ride_id)
-    if not ride:
-        return {"error": "Ride request not found", "code": "not_found"}
-    return {"ride": asdict(ride)}
-
+    engine = get_engine()
+    with Session(engine) as session:
+        # Convert string ID from URL to integer for the DB lookup
+        ride = session.get(RideRequestModel, int(ride_id))
+        if not ride:
+            return {"error": "Ride request not found", "code": "not_found"}
+        return {
+            "ride": {
+                "id": str(ride.request_id),
+                "status": ride.status,
+                "date": ride.ride_date.isoformat()
+            }
+        }
 
 def delete_ride_request(ride_id: str) -> dict:
-    if ride_id not in _RIDE_REQUESTS:
-        return {"error": "Ride request not found", "code": "not_found"}
-    del _RIDE_REQUESTS[ride_id]
-    return {"message": "Ride request deleted", "ride_id": ride_id}
-
-
-def update_ride_request(ride_id: str, data: dict) -> dict:
-    ride = _RIDE_REQUESTS.get(ride_id)
-    if not ride:
-        return {"error": "Ride request not found", "code": "not_found"}
-
-    pickup = ride.pickup_location
-    dropoff = ride.dropoff_location
-    date_str = ride.date
-    pickup_window_start = ride.pickup_window_start
-    pickup_window_end = ride.pickup_window_end
-    dropoff_window_start = ride.dropoff_window_start
-    dropoff_window_end = ride.dropoff_window_end
-
-    if "pickup_location" in data:
-        pickup = (data.get("pickup_location") or "").strip()
-    if "dropoff_location" in data:
-        dropoff = (data.get("dropoff_location") or "").strip()
-    if "pickup_window_start" in data:
-        pickup_window_start = (data.get("pickup_window_start") or "").strip()
-    if "pickup_window_end" in data:
-        pickup_window_end = (data.get("pickup_window_end") or "").strip()
-    if "dropoff_window_start" in data:
-        dropoff_window_start = (data.get("dropoff_window_start") or "").strip()
-    if "dropoff_window_end" in data:
-        dropoff_window_end = (data.get("dropoff_window_end") or "").strip()
-    if "date" in data:
-        date_str = (data.get("date") or "").strip()
-
-    if not date_str:
-        date_str = _derive_date(pickup_window_start)
-
-    updated = RideRequest(
-        id=ride.id,
-        pickup_location=pickup,
-        dropoff_location=dropoff,
-        date=date_str,
-        pickup_window_start=pickup_window_start,
-        pickup_window_end=pickup_window_end,
-        dropoff_window_start=dropoff_window_start,
-        dropoff_window_end=dropoff_window_end,
-        status="Pending Optimization",
-        created_at=ride.created_at,
-    )
-    _RIDE_REQUESTS[ride_id] = updated
-
-    return {"message": "Ride request updated", "ride": asdict(updated)}
-
+    engine = get_engine()
+    with Session(engine) as session:
+        ride = session.get(RideRequestModel, int(ride_id))
+        if not ride:
+            return {"error": "Ride request not found", "code": "not_found"}
+        
+        session.delete(ride)
+        session.commit()
+        return {"message": "Ride request deleted", "ride_id": ride_id}

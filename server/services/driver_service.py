@@ -1,115 +1,78 @@
-"""
-Driver service layer.
-
-Bare-minimum in-memory persistence while we iterate quickly.
-"""
-
 from __future__ import annotations
-
-from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from uuid import uuid4
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-
-@dataclass
-class RouteStop:
-    id: str
-    label: str
-
-
-@dataclass
-class DriverRoute:
-    id: str
-    status: str  # available | accepted | completed
-    driver_id: str | None = None
-    stops: list[RouteStop] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat(timespec="seconds") + "Z")
-
-
-# In-memory store (temporary). Replace with SQL Server persistence later.
-_ROUTES: dict[str, DriverRoute] = {}
-
-
-def _ensure_seed_data() -> None:
-    """
-    Seed a small demo route so driver endpoints are testable immediately.
-
-    In the real system, routes will be created by the nightly optimization job.
-    """
-    if _ROUTES:
-        return
-
-    route_id = str(uuid4())
-    _ROUTES[route_id] = DriverRoute(
-        id=route_id,
-        status="available",
-        stops=[
-            RouteStop(id=str(uuid4()), label="Pickup: Example Home"),
-            RouteStop(id=str(uuid4()), label="Dropoff: Example Employer"),
-        ],
-    )
-
+from server.db import get_engine
+from server.models.route import Route as RouteModel
+from server.models.route_stop import RouteStop as StopModel
 
 def list_available_routes() -> dict:
-    _ensure_seed_data()
-    available = [r for r in _ROUTES.values() if r.status == "available"]
-    return {"routes": [asdict(r) for r in available]}
-
-
-def accept_route(route_id: str, data: dict) -> dict:
-    _ensure_seed_data()
-    route = _ROUTES.get(route_id)
-    if not route:
-        return {"error": "Route not found", "code": "not_found"}
-
-    driver_id = (data.get("driver_id") or "").strip() or None
-    route.status = "accepted"
-    route.driver_id = driver_id
-    return {"message": "Route accepted", "route": asdict(route)}
-
+    engine = get_engine()
+    with Session(engine) as session:
+        # We only want routes that haven't been completed or fully assigned yet
+        stmt = select(RouteModel).where(RouteModel.status == "available")
+        results = session.execute(stmt).scalars().all()
+        
+        return {
+            "routes": [
+                {
+                    "id": str(r.route_id),
+                    "status": r.status,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "stop_count": len(r.stops)
+                } for r in results
+            ]
+        }
 
 def get_route(route_id: str) -> dict:
-    _ensure_seed_data()
-    route = _ROUTES.get(route_id)
-    if not route:
-        return {"error": "Route not found", "code": "not_found"}
-    return {"route": asdict(route)}
+    engine = get_engine()
+    with Session(engine) as session:
+        # Use session.get for primary key lookup
+        route = session.get(RouteModel, int(route_id))
+        if not route:
+            return {"error": "Route not found", "code": "not_found"}
+            
+        # Format the stops for the Driver's mobile-style view
+        stops = []
+        for s in route.stops:
+            stops.append({
+                "id": str(s.stop_id),
+                "label": s.stop_type, # e.g., 'pickup' or 'dropoff'
+                "arrival_time": s.planned_arrival_time.isoformat() if s.planned_arrival_time else None
+            })
 
+        return {
+            "route": {
+                "id": str(route.route_id),
+                "status": route.status,
+                "stops": stops
+            }
+        }
+
+def accept_route(route_id: str, data: dict) -> dict:
+    engine = get_engine()
+    try:
+        with Session(engine) as session:
+            route = session.get(RouteModel, int(route_id))
+            if not route:
+                return {"error": "Route not found", "code": "not_found"}
+
+            route.status = "accepted"
+            route.driver_id = data.get("driver_id") # Link to the driver's User ID
+            session.commit()
+            
+            return {"message": "Route accepted", "route": {"id": str(route.route_id), "status": route.status}}
+    except Exception as e:
+        return {"error": str(e), "code": "db_failure"}
 
 def complete_route(route_id: str) -> dict:
-    _ensure_seed_data()
-    route = _ROUTES.get(route_id)
-    if not route:
-        return {"error": "Route not found", "code": "not_found"}
-    route.status = "completed"
-    return {"message": "Route completed", "route": asdict(route)}
-
-
-def remove_stop(route_id: str, data: dict) -> dict:
-    """
-    Remove a stop from a route.
-
-    Body supports either:
-    - { "stop_id": "<uuid>" }
-    - { "stop_index": 0 }
-    """
-    _ensure_seed_data()
-    route = _ROUTES.get(route_id)
-    if not route:
-        return {"error": "Route not found", "code": "not_found"}
-
-    stop_id = (data.get("stop_id") or "").strip()
-    stop_index = data.get("stop_index", None)
-
-    if stop_id:
-        route.stops = [s for s in route.stops if s.id != stop_id]
-    elif isinstance(stop_index, int):
-        if 0 <= stop_index < len(route.stops):
-            route.stops.pop(stop_index)
-    else:
-        # No identifier provided: simplest behavior is to remove the first stop (if any).
-        if route.stops:
-            route.stops.pop(0)
-
-    return {"message": "Stop removed", "route": asdict(route)}
-
+    engine = get_engine()
+    with Session(engine) as session:
+        route = session.get(RouteModel, int(route_id))
+        if not route:
+            return {"error": "Route not found", "code": "not_found"}
+            
+        route.status = "completed"
+        session.commit()
+        return {"message": "Route completed", "route": {"id": str(route.route_id), "status": "completed"}}

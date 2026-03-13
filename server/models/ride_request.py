@@ -1,12 +1,9 @@
 from __future__ import annotations
-
 from datetime import date, datetime
-
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship # Added relationship
 
 from server.models.base import Base
-
 
 class RideRequest(Base):
     __tablename__ = "Ride_requests"
@@ -19,11 +16,18 @@ class RideRequest(Base):
 
     request_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     passenger_id: Mapped[int] = mapped_column(ForeignKey("Users.user_id"), nullable=False)
+    
     pickup_client_location_id: Mapped[int] = mapped_column(
         ForeignKey("Client_locations.client_location_id"), nullable=False
     )
     dropoff_client_location_id: Mapped[int] = mapped_column(
         ForeignKey("Client_locations.client_location_id"), nullable=False
+    )
+
+    # NEW RELATIONSHIP
+    pickup_location: Mapped["ClientLocation"] = relationship(
+        "ClientLocation", 
+        foreign_keys=[pickup_client_location_id]
     )
 
     ride_date: Mapped[date] = mapped_column(Date, nullable=False)
@@ -35,4 +39,3 @@ class RideRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="requested")
     api_shipment_label: Mapped[str] = mapped_column(String(255), nullable=False)
-
