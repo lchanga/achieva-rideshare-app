@@ -1,8 +1,9 @@
 from __future__ import annotations
 from datetime import date, datetime
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship # Added relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+# We need to make sure this Base is the one that knows about the 'dbo' schema
 from server.models.base import Base
 
 class RideRequest(Base):
@@ -12,22 +13,19 @@ class RideRequest(Base):
             "status IN ('requested','scheduled','cancelled_by_passenger','cancelled_by_driver','completed')",
             name="CHK_RequestStatus",
         ),
+        {"schema": "dbo"} # <--- ADD THIS LINE
     )
 
     request_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    passenger_id: Mapped[int] = mapped_column(ForeignKey("Users.user_id"), nullable=False)
+    
+    # Update these ForeignKeys to include the dbo. prefix
+    passenger_id: Mapped[int] = mapped_column(ForeignKey("dbo.Users.user_id"), nullable=False)
     
     pickup_client_location_id: Mapped[int] = mapped_column(
-        ForeignKey("Client_locations.client_location_id"), nullable=False
+        ForeignKey("dbo.Client_locations.client_location_id"), nullable=False
     )
     dropoff_client_location_id: Mapped[int] = mapped_column(
-        ForeignKey("Client_locations.client_location_id"), nullable=False
-    )
-
-    # NEW RELATIONSHIP
-    pickup_location: Mapped["ClientLocation"] = relationship(
-        "ClientLocation", 
-        foreign_keys=[pickup_client_location_id]
+        ForeignKey("dbo.Client_locations.client_location_id"), nullable=False
     )
 
     ride_date: Mapped[date] = mapped_column(Date, nullable=False)
