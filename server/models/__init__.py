@@ -1,5 +1,6 @@
 from server.models.base import Base
 from server.models.client_location import ClientLocation
+from server.models.driver_availability import DriverAvailability
 from server.models.location import Location
 from server.models.optimization_run import OptimizationRun
 from server.models.optimized_route import OptimizedRoute
@@ -12,6 +13,7 @@ __all__ = [
     "Location",
     "User",
     "ClientLocation",
+    "DriverAvailability",
     "OptimizationRun",
     "RideRequest",
     "OptimizedRoute",

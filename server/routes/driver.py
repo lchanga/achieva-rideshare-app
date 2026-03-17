@@ -3,18 +3,16 @@ from flask_smorest import Blueprint, abort
 
 from server.schemas.common import ErrorSchema
 from server.schemas.driver import (
-    AcceptRouteRequestSchema,
     MessageRouteResponseSchema,
-    RemoveStopRequestSchema,
     RouteResponseSchema,
     RoutesListResponseSchema,
+    TodayRouteResponseSchema,
 )
 from server.services.driver_service import (
-    accept_route,
     complete_route,
+    get_driver_today_route,
     get_route,
-    list_available_routes,
-    remove_stop,
+    start_route,
 )
 
 driver_blp = Blueprint(
@@ -25,23 +23,14 @@ driver_blp = Blueprint(
 )
 
 
-@driver_blp.route("/routes/available")
-class AvailableRoutesResource(MethodView):
-    @driver_blp.response(200, RoutesListResponseSchema)
-    def get(self):
-        return list_available_routes()
-
-
-@driver_blp.route("/routes/<string:route_id>/accept")
-class AcceptRouteResource(MethodView):
-    @driver_blp.arguments(AcceptRouteRequestSchema, required=False)
-    @driver_blp.response(200, MessageRouteResponseSchema)
-    @driver_blp.alt_response(400, schema=ErrorSchema)
+@driver_blp.route("/<string:driver_id>/today-route")
+class DriverTodayRouteResource(MethodView):
+    @driver_blp.response(200, TodayRouteResponseSchema)
     @driver_blp.alt_response(404, schema=ErrorSchema)
-    def post(self, data: dict, route_id: str):
-        result = accept_route(route_id, data or {})
+    def get(self, driver_id: str):
+        result = get_driver_today_route(driver_id)
         if "error" in result:
-            abort(404 if result.get("code") == "not_found" else 400, **result)
+            abort(404, **result)
         return result
 
 
@@ -67,15 +56,13 @@ class CompleteRouteResource(MethodView):
         return result
 
 
-@driver_blp.route("/routes/<string:route_id>/remove-stop")
-class RemoveStopResource(MethodView):
-    @driver_blp.arguments(RemoveStopRequestSchema)
+@driver_blp.route("/routes/<string:route_id>/start")
+class StartRouteResource(MethodView):
     @driver_blp.response(200, MessageRouteResponseSchema)
-    @driver_blp.alt_response(400, schema=ErrorSchema)
     @driver_blp.alt_response(404, schema=ErrorSchema)
-    def post(self, data: dict, route_id: str):
-        result = remove_stop(route_id, data)
+    def post(self, route_id: str):
+        result = start_route(route_id)
         if "error" in result:
-            abort(404 if result.get("code") == "not_found" else 400, **result)
+            abort(404, **result)
         return result
 

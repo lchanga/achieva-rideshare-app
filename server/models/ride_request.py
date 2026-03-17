@@ -37,3 +37,12 @@ class RideRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="requested")
     api_shipment_label: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    pickup_location: Mapped["ClientLocation"] = relationship(
+        "ClientLocation",
+        foreign_keys=[pickup_client_location_id],
+    )
+    dropoff_location: Mapped["ClientLocation"] = relationship(
+        "ClientLocation",
+        foreign_keys=[dropoff_client_location_id],
+    )

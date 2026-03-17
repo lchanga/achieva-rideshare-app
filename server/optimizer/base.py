@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from typing import Protocol
+from abc import ABC, abstractmethod
 
 
-class Optimizer(Protocol):
-    """
-    Optimizer interface.
-
-    Implementations must accept an OptimizeToursRequest JSON dict and return an
-    OptimizeToursResponse JSON dict (Google Route Optimization API shape).
-    """
-
-    def optimize_tours(self, request_json: dict) -> dict: ...
-
+class BaseOptimizer(ABC):
+    @staticmethod
+    @abstractmethod
+    def run_optimization_sync() -> dict:
+        """Generate and persist routes for the current optimization mode."""

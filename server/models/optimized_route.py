@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date, datetime
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from server.models.base import Base
 
 class OptimizedRoute(Base):
@@ -23,3 +23,8 @@ class OptimizedRoute(Base):
     
     
     run_id: Mapped[int] = mapped_column(ForeignKey("dbo.Optimization_runs.run_id"), nullable=False)
+    stops: Mapped[list["RouteStop"]] = relationship(
+        "RouteStop",
+        back_populates="route",
+        order_by="RouteStop.stop_sequence",
+    )
