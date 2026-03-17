@@ -1,29 +1,25 @@
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 
-from server.optimizer import optimize_tours
+from server.optimizer import get_optimizer
 from server.schemas.common import ErrorSchema
-from server.schemas.optimizer import OptimizeToursAnySchema
+from server.schemas.common import MessageSchema
 
 optimizer_blp = Blueprint(
     "optimizer",
     __name__,
     url_prefix="/api/optimizer",
-    description="Route optimization entrypoint (fake now, Google later)",
+    description="Database-backed route optimization",
 )
 
 
-@optimizer_blp.route("/optimize-tours")
-class OptimizeToursResource(MethodView):
-    @optimizer_blp.arguments(OptimizeToursAnySchema)
-    @optimizer_blp.response(200, None)
-    @optimizer_blp.alt_response(400, schema=ErrorSchema)
-    def post(self, req_json: dict):
-        if not isinstance(req_json, dict):
-            abort(400, error="Request body must be a JSON object")
-
+@optimizer_blp.route("/run")
+class RunOptimizationResource(MethodView):
+    @optimizer_blp.response(200, MessageSchema)
+    @optimizer_blp.alt_response(500, schema=ErrorSchema)
+    def post(self):
         try:
-            return optimize_tours(req_json)
+            return get_optimizer().run_optimization_sync()
         except Exception as e:
-            abort(400, error=str(e))
+            abort(500, error=str(e))
 
