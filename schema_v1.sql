@@ -51,7 +51,17 @@ CREATE TABLE Optimization_runs (
     CONSTRAINT Optimization_runs_pk PRIMARY KEY (run_id)
 );
 
--- 5. Ride_requests (Request_status Enum)
+-- 5. Driver_availability
+CREATE TABLE Driver_availability (
+    availability_id int IDENTITY(1,1) NOT NULL,
+    driver_id int NOT NULL,
+    is_available bit NOT NULL DEFAULT 1,
+    CONSTRAINT Driver_availability_pk PRIMARY KEY (availability_id),
+    CONSTRAINT UQ_DriverAvailability_driver_id UNIQUE (driver_id),
+    CONSTRAINT FK_DriverAvailability_User FOREIGN KEY (driver_id) REFERENCES Users(user_id)
+);
+
+-- 6. Ride_requests (Request_status Enum)
 CREATE TABLE Ride_requests (
     request_id int IDENTITY(1,1) NOT NULL,
     passenger_id int NOT NULL,
@@ -72,7 +82,7 @@ CREATE TABLE Ride_requests (
     CONSTRAINT CHK_RequestStatus CHECK (status IN ('requested', 'scheduled', 'cancelled_by_passenger', 'cancelled_by_driver', 'completed'))
 );
 
--- 6. Optimized_routes (Route_status Enum)
+-- 7. Optimized_routes (Route_status Enum)
 CREATE TABLE Optimized_routes (
     route_id int IDENTITY(1,1) NOT NULL,
     driver_id int NULL,
@@ -87,7 +97,7 @@ CREATE TABLE Optimized_routes (
     CONSTRAINT CHK_RouteStatus CHECK (status IN ('available', 'assigned', 'in_progress', 'completed'))
 );
 
--- 7. Route_stops (Stop_type & Stop_status Enums)
+-- 8. Route_stops (Stop_type & Stop_status Enums)
 CREATE TABLE Route_stops (
     stop_id int IDENTITY(1,1) NOT NULL,
     route_id int NOT NULL,
