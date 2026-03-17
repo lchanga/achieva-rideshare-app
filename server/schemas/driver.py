@@ -22,3 +22,8 @@ class MessageRouteResponseSchema(Schema):
     message = fields.Str(required=True)
     route = fields.Dict(required=True)
 
+
+class TodayRouteResponseSchema(Schema):
+    message = fields.Str(required=True)
+    route = fields.Dict(required=False, allow_none=True)
+

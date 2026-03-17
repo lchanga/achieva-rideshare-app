@@ -69,3 +69,29 @@ class LocationDeleteResponseSchema(Schema):
     message = fields.Str(required=True)
     location_id = fields.Str(required=True)
 
+
+class DriverAvailabilitySchema(Schema):
+    availability_id = fields.Int(dump_only=True)
+    driver_id = fields.Int(required=True)
+    full_name = fields.Str(dump_only=True)
+    email = fields.Str(dump_only=True, allow_none=True)
+    is_available = fields.Bool(required=True)
+
+
+class DriverAvailabilityCreateSchema(Schema):
+    driver_id = fields.Int(required=True)
+    is_available = fields.Bool(required=False, load_default=True)
+
+
+class DriverAvailabilityUpdateSchema(Schema):
+    is_available = fields.Bool(required=True)
+
+
+class DriverAvailabilityListResponseSchema(Schema):
+    drivers = fields.List(fields.Nested(DriverAvailabilitySchema), required=True)
+
+
+class DriverAvailabilityResponseSchema(Schema):
+    message = fields.Str(required=True)
+    driver = fields.Nested(DriverAvailabilitySchema, required=True)
+

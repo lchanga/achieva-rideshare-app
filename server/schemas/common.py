@@ -10,3 +10,8 @@ class ErrorSchema(Schema):
 class MessageSchema(Schema):
     message = fields.Str(required=True)
 
+
+class MessageIdSchema(Schema):
+    message = fields.Str(required=True)
+    driver_id = fields.Str(required=True)
+
