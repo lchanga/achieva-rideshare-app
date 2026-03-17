@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.models.base import Base
 
@@ -29,3 +29,5 @@ class RouteStop(Base):
     actual_arrival: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     planned_arrival: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+
+    route: Mapped["OptimizedRoute"] = relationship("OptimizedRoute", back_populates="stops")
