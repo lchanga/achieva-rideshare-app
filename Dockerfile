@@ -17,6 +17,6 @@ RUN pip install --no-cache-dir -r server/requirements.txt
 # Copy the rest of the app
 COPY . .
 
-# Flask stuff
+# Flask app entrypoint
 EXPOSE 5000
 CMD ["python", "-m", "server.run"]
