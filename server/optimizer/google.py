@@ -168,9 +168,11 @@ class GoogleOptimizer:
         if not project_id:
             return {"message": "GOOGLE_CLOUD_PROJECT is not configured."}
 
+        
         client = optimization_v1.FleetRoutingClient(
             client_options=ClientOptions(api_key=api_key)
         )
+        
         parent = f"projects/{project_id}/locations/{GoogleOptimizer.DEFAULT_LOCATION}"
 
         with Session(get_engine()) as session:
@@ -232,8 +234,9 @@ class GoogleOptimizer:
                 session.commit()
                 return {"message": "Requested rides are missing pickup or dropoff locations."}
 
-            global_start = min(ride.pickup_window_start for ride in ride_by_shipment_index.values())
-            global_end = max(ride.dropoff_window_end for ride in ride_by_shipment_index.values())
+            
+            global_start = min(ride.pickup_window_start for ride in ride_by_shipment_index.values()) - timedelta(hours=1)
+            global_end = max(ride.dropoff_window_end for ride in ride_by_shipment_index.values()) + timedelta(hours=1)
 
             vehicles = [
                 GoogleOptimizer._build_vehicle(driver, hq_location, global_start, global_end)
@@ -258,7 +261,8 @@ class GoogleOptimizer:
                 new_run.error_message = str(exc)
                 new_run.ended_at = datetime.utcnow()
                 session.commit()
-                raise
+  
+                return {"message": f"Google API Error: {str(exc)}"}
 
             scheduled_request_ids: set[int] = set()
             created_route_count = 0
