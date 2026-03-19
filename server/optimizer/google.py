@@ -160,22 +160,29 @@ class GoogleOptimizer:
 
     @staticmethod
     def run_optimization_sync() -> dict:
-        api_key = os.getenv("GOOGLE_ROUTE_OPTIMIZATION_API_KEY")
-        if not api_key:
-            return {"message": "GOOGLE_ROUTE_OPTIMIZATION_API_KEY is not configured."}
-
+        """
+        Main entry point for triggering the Google Route Optimization API.
+        Uses Service Account credentials via GOOGLE_APPLICATION_CREDENTIALS.
+        """
+      
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
         if not project_id:
-            return {"message": "GOOGLE_CLOUD_PROJECT is not configured."}
+            return {"message": "GOOGLE_CLOUD_PROJECT is not configured in .env."}
 
-        client = optimization_v1.FleetRoutingClient(
-            client_options=ClientOptions(api_key=api_key)
-        )
-        parent = f"projects/{project_id}/locations/{GoogleOptimizer.DEFAULT_LOCATION}"
+        try:
+            client = optimization_v1.FleetRoutingClient()
+        except Exception as e:
+            return {"message": f"Failed to initialize Google Client: {str(e)}"}
+
+      
+        location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+        parent = f"projects/{project_id}/locations/{location}"
 
         with Session(get_engine()) as session:
             now = datetime.utcnow()
             target_ride_date = GoogleOptimizer._target_ride_date()
+            
+          
             new_run = OptimizationRun(
                 ride_date=target_ride_date,
                 started_at=now,
@@ -184,6 +191,7 @@ class GoogleOptimizer:
             session.add(new_run)
             session.flush()
 
+           
             rides = session.execute(
                 select(RideRequest)
                 .options(joinedload(RideRequest.pickup_location).joinedload(ClientLocation.location))
@@ -201,14 +209,17 @@ class GoogleOptimizer:
                 session.commit()
                 return {"message": f"No requested rides to optimize for {target_ride_date.isoformat()}"}
 
+           
             available_drivers = GoogleOptimizer._available_drivers(session)
             if not available_drivers:
                 new_run.error_message = "No available drivers configured."
                 new_run.ended_at = datetime.utcnow()
                 session.commit()
                 return {"message": "No available drivers configured."}
+            
             random.shuffle(available_drivers)
 
+            
             hq_location = GoogleOptimizer._hq_location(session)
             if not hq_location:
                 new_run.error_message = "No HQ location available for vehicle start/end."
@@ -216,6 +227,7 @@ class GoogleOptimizer:
                 session.commit()
                 return {"message": "No HQ location available for vehicle start/end."}
 
+            
             shipments: list[optimization_v1.Shipment] = []
             ride_by_shipment_index: dict[int, RideRequest] = {}
             for ride in rides:
@@ -232,14 +244,17 @@ class GoogleOptimizer:
                 session.commit()
                 return {"message": "Requested rides are missing pickup or dropoff locations."}
 
-            global_start = min(ride.pickup_window_start for ride in ride_by_shipment_index.values())
-            global_end = max(ride.dropoff_window_end for ride in ride_by_shipment_index.values())
+            
+            global_start = min(ride.pickup_window_start for ride in ride_by_shipment_index.values()) - timedelta(hours=1)
+            global_end = max(ride.dropoff_window_end for ride in ride_by_shipment_index.values()) + timedelta(hours=1)
 
+            
             vehicles = [
                 GoogleOptimizer._build_vehicle(driver, hq_location, global_start, global_end)
                 for _, driver in available_drivers
             ]
 
+            
             request = optimization_v1.OptimizeToursRequest(
                 parent=parent,
                 model=optimization_v1.ShipmentModel(
@@ -252,14 +267,16 @@ class GoogleOptimizer:
                 populate_polylines=True,
             )
 
+            
             try:
                 response = client.optimize_tours(request=request)
             except Exception as exc:
                 new_run.error_message = str(exc)
                 new_run.ended_at = datetime.utcnow()
                 session.commit()
-                raise
+                return {"message": f"Google API Error: {str(exc)}"}
 
+            
             scheduled_request_ids: set[int] = set()
             created_route_count = 0
 
@@ -287,10 +304,12 @@ class GoogleOptimizer:
                     is_pickup = bool(visit.is_pickup)
                     client_location = ride.pickup_location if is_pickup else ride.dropoff_location
                     location = client_location.location if client_location else None
+                    
                     planned_arrival = GoogleOptimizer._to_naive_utc(
                         visit.start_time,
                         ride.pickup_window_start if is_pickup else ride.dropoff_window_start,
                     )
+                    
                     if location is None:
                         continue
 
@@ -307,10 +326,12 @@ class GoogleOptimizer:
                     )
                     scheduled_request_ids.add(ride.request_id)
 
+            
             for ride in rides:
                 if ride.request_id in scheduled_request_ids:
                     ride.status = "scheduled"
 
+            
             skipped_count = len(response.skipped_shipments)
             if skipped_count:
                 new_run.error_message = f"{skipped_count} shipment(s) were skipped by the optimizer."
@@ -318,6 +339,7 @@ class GoogleOptimizer:
             new_run.success = True
             new_run.ended_at = datetime.utcnow()
             session.commit()
+            
             return {
                 "message": (
                     f"Successfully optimized {len(scheduled_request_ids)} ride(s) "

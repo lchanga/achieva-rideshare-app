@@ -5,9 +5,11 @@ services:
       - "5000:5000"
     volumes:
       - .:/app
+      - ./server/google-credentials.json:/app/server/google-credentials.json
     environment:
       - DATABASE_URL=mssql+pyodbc://ondemandtransport:nxFpdQpyEEz33B@192.168.200.61:1433/ondemandtransport?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=no
       - OPTIMIZER_MODE=${OPTIMIZER_MODE}
+      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}
       - GOOGLE_ROUTE_OPTIMIZATION_API_KEY=${GOOGLE_ROUTE_OPTIMIZATION_API_KEY}
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION}
